@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPARQL Query Runner — Wikidata</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a2029;
+    --border: #2c3540;
+    --text: #e6edf3;
+    --muted: #8b98a5;
+    --accent: #3b82f6;
+    --accent-hover: #2563eb;
+    --green: #2ea043;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); font-size: 13px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+  .field { margin-bottom: 16px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  input[type="text"], textarea {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    resize: vertical;
+  }
+  textarea { min-height: 200px; line-height: 1.45; }
+  input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 20px; }
+  button {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: var(--accent-hover); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-weight: 500;
+  }
+  button.secondary:hover:not(:disabled) { background: var(--panel); }
+  .status { font-size: 13px; color: var(--muted); }
+  .status.error { color: #f85149; }
+  .status.ok { color: var(--green); }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .tab {
+    background: none; border: none; color: var(--muted);
+    padding: 10px 14px; font-size: 14px; cursor: pointer;
+    border-bottom: 2px solid transparent; font-weight: 500; border-radius: 0;
+  }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 14px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .card a { display: block; }
+  .card img {
+    width: 100%; height: 180px; object-fit: cover; display: block; background: #000;
+  }
+  .card .cap {
+    padding: 8px 10px; font-size: 13px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .card .cap a { color: var(--text); text-decoration: none; }
+  .card .cap a:hover { text-decoration: underline; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); position: sticky; top: 0; background: var(--bg); }
+  td a { color: var(--accent); }
+  .table-wrap { max-height: 600px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+  pre {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px; overflow: auto; max-height: 600px; font-size: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .hidden { display: none; }
+  .meta { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>SPARQL Query Runner</h1>
+  <p>Run a SPARQL query against a Wikidata-style endpoint, preview the results, and download the data.</p>
+</header>
+
+<main>
+  <div class="field">
+    <label for="endpoint">Endpoint URL</label>
+    <input type="text" id="endpoint" value="https://query.wikidata.org/sparql">
+  </div>
+
+  <div class="field">
+    <label for="query">SPARQL query</label>
+    <textarea id="query" spellcheck="false">#Cats, with pictures
+# ----
+#title: Cats, with pictures
+#defaultView:ImageGrid
+SELECT ?item ?itemLabel ?pic WHERE {
+  ?item wdt:P31 wd:Q146;
+    wdt:P18 ?pic.
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],mul,en". }
+}</textarea>
+  </div>
+
+  <div class="toolbar">
+    <button id="runBtn">Run query</button>
+    <button id="downloadJson" class="secondary" disabled>Download JSON</button>
+    <button id="downloadCsv" class="secondary" disabled>Download CSV</button>
+    <span id="status" class="status">Ready.</span>
+  </div>
+
+  <div id="results" class="hidden">
+    <div class="tabs">
+      <button class="tab active" data-view="grid">Image grid</button>
+      <button class="tab" data-view="table">Table</button>
+      <button class="tab" data-view="raw">Raw JSON</button>
+    </div>
+    <div id="meta" class="meta"></div>
+    <div id="view-grid" class="grid"></div>
+    <div id="view-table" class="hidden"></div>
+    <pre id="view-raw" class="hidden"></pre>
+  </div>
+</main>
+
+<script>
+// Dispatcher based on the Wikidata example, with a small UX addition:
+// an explicit User-Agent-friendly Accept header and error surfacing.
+class SPARQLQueryDispatcher {
+  constructor(endpoint) {
+    this.endpoint = endpoint;
+  }
+
+  async query(sparqlQuery) {
+    const fullUrl = this.endpoint + '?query=' + encodeURIComponent(sparqlQuery);
+    const headers = { 'Accept': 'application/sparql-results+json' };
+    const response = await fetch(fullUrl, { headers });
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new Error('HTTP ' + response.status + ' ' + response.statusText + (text ? '\n' + text.slice(0, 500) : ''));
+    }
+    return response.json();
+  }
+}
+
+const els = {
+  endpoint: document.getElementById('endpoint'),
+  query: document.getElementById('query'),
+  runBtn: document.getElementById('runBtn'),
+  downloadJson: document.getElementById('downloadJson'),
+  downloadCsv: document.getElementById('downloadCsv'),
+  status: document.getElementById('status'),
+  results: document.getElementById('results'),
+  meta: document.getElementById('meta'),
+  grid: document.getElementById('view-grid'),
+  table: document.getElementById('view-table'),
+  raw: document.getElementById('view-raw'),
+};
+
+let lastResult = null;
+
+function setStatus(msg, kind) {
+  els.status.textContent = msg;
+  els.status.className = 'status' + (kind ? ' ' + kind : '');
+}
+
+function pickImageVar(vars, bindings) {
+  // Heuristic: find a variable whose values look like image URLs.
+  const sample = bindings.find(b => b) || {};
+  for (const v of vars) {
+    const val = sample[v];
+    if (val && val.type === 'uri' && /commons|\.(jpg|jpeg|png|gif|svg|tif|webp)/i.test(val.value)) {
+      return v;
+    }
+  }
+  return vars.find(v => /pic|image|img|photo/i.test(v)) || null;
+}
+
+function pickLabelVar(vars) {
+  return vars.find(v => /label/i.test(v)) || vars.find(v => !/pic|image|img|item|^\w+Url$/i.test(v)) || vars[0];
+}
+
+function renderGrid(data) {
+  const vars = data.head.vars;
+  const rows = data.results.bindings;
+  const imgVar = pickImageVar(vars, rows);
+  const labelVar = pickLabelVar(vars);
+  const linkVar = vars.find(v => v === 'item') || vars[0];
+
+  els.grid.innerHTML = '';
+  if (!imgVar) {
+    els.grid.innerHTML = '<p class="status">No image column detected — use the Table or Raw JSON view.</p>';
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  rows.forEach(row => {
+    const pic = row[imgVar] && row[imgVar].value;
+    if (!pic) return;
+    const label = (row[labelVar] && row[labelVar].value) || '';
+    const link = (row[linkVar] && row[linkVar].value) || pic;
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    const imgLink = document.createElement('a');
+    imgLink.href = pic; imgLink.target = '_blank'; imgLink.rel = 'noopener';
+    const img = document.createElement('img');
+    img.loading = 'lazy';
+    // Use Commons thumbnail service for faster, smaller images when possible.
+    img.src = thumbUrl(pic, 360);
+    img.alt = label;
+    img.onerror = () => { img.onerror = null; img.src = pic; };
+    imgLink.appendChild(img);
+    const cap = document.createElement('div');
+    cap.className = 'cap';
+    const capLink = document.createElement('a');
+    capLink.href = link; capLink.target = '_blank'; capLink.rel = 'noopener';
+    capLink.textContent = label || link;
+    cap.appendChild(capLink);
+    card.appendChild(imgLink);
+    card.appendChild(cap);
+    frag.appendChild(card);
+  });
+  els.grid.appendChild(frag);
+}
+
+function thumbUrl(url, width) {
+  // Special:FilePath supports a ?width= param for on-the-fly thumbnails.
+  if (/Special:FilePath/i.test(url)) {
+    return url + (url.includes('?') ? '&' : '?') + 'width=' + width;
+  }
+  return url;
+}
+
+function renderTable(data) {
+  const vars = data.head.vars;
+  const rows = data.results.bindings;
+  let html = '<div class="table-wrap"><table><thead><tr>';
+  vars.forEach(v => { html += '<th>' + escapeHtml(v) + '</th>'; });
+  html += '</tr></thead><tbody>';
+  rows.forEach(row => {
+    html += '<tr>';
+    vars.forEach(v => {
+      const cell = row[v];
+      if (!cell) { html += '<td></td>'; return; }
+      if (cell.type === 'uri') {
+        html += '<td><a href="' + escapeHtml(cell.value) + '" target="_blank" rel="noopener">' + escapeHtml(cell.value) + '</a></td>';
+      } else {
+        html += '<td>' + escapeHtml(cell.value) + '</td>';
+      }
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  els.table.innerHTML = html;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+function toCsv(data) {
+  const vars = data.head.vars;
+  const rows = data.results.bindings;
+  const esc = v => {
+    const s = v == null ? '' : String(v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const lines = [vars.map(esc).join(',')];
+  rows.forEach(row => {
+    lines.push(vars.map(v => esc(row[v] ? row[v].value : '')).join(','));
+  });
+  return lines.join('\n');
+}
+
+function download(filename, text, mime) {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function run() {
+  const endpoint = els.endpoint.value.trim();
+  const sparql = els.query.value;
+  if (!endpoint) { setStatus('Enter an endpoint URL.', 'error'); return; }
+
+  els.runBtn.disabled = true;
+  setStatus('Running query…');
+  try {
+    const dispatcher = new SPARQLQueryDispatcher(endpoint);
+    const t0 = performance.now();
+    const data = await dispatcher.query(sparql);
+    const ms = Math.round(performance.now() - t0);
+
+    lastResult = data;
+    const count = data.results && data.results.bindings ? data.results.bindings.length : 0;
+    els.meta.textContent = count + ' result' + (count === 1 ? '' : 's') + ' · ' + ms + ' ms';
+
+    renderGrid(data);
+    renderTable(data);
+    els.raw.textContent = JSON.stringify(data, null, 2);
+
+    els.results.classList.remove('hidden');
+    els.downloadJson.disabled = false;
+    els.downloadCsv.disabled = false;
+    setStatus('Done.', 'ok');
+  } catch (err) {
+    setStatus('Query failed: ' + err.message, 'error');
+    console.error(err);
+  } finally {
+    els.runBtn.disabled = false;
+  }
+}
+
+// Tab switching
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const view = tab.dataset.view;
+    els.grid.classList.toggle('hidden', view !== 'grid');
+    els.table.classList.toggle('hidden', view !== 'table');
+    els.raw.classList.toggle('hidden', view !== 'raw');
+  });
+});
+
+els.runBtn.addEventListener('click', run);
+els.downloadJson.addEventListener('click', () => {
+  if (lastResult) download('sparql-results.json', JSON.stringify(lastResult, null, 2), 'application/json');
+});
+els.downloadCsv.addEventListener('click', () => {
+  if (lastResult) download('sparql-results.csv', toCsv(lastResult), 'text/csv');
+});
+
+// Ctrl/Cmd+Enter to run
+els.query.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); run(); }
+});
+</script>
+</body>
+</html>

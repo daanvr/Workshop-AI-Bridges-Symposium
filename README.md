@@ -89,6 +89,11 @@ AI assistant to produce something small and visible.
 - [Wikidata to an interactive page](./docs/exercises/wikidata-to-interactive-page.md): query Wikidata via SPARQL, export the query as JavaScript, and ask an AI to turn the result into a self contained HTML visualisation.
 - [Wikipedia to QuickStatements](./docs/exercises/wikipedia-to-quickstatements.md): take messy text from a Wikipedia article (body or references) and have an AI assistant turn it into QuickStatements, verified line by line and run against the Wikidata Sandbox before any real item.
 - [Converting data from one format to another](./docs/exercises/data-format-conversion.md): take CSV, ugly JSON, or a spreadsheet and convert it to clean JSON, CSV, markdown, or QuickStatements. Compares the non-deterministic route (AI rewrites the data directly) with the deterministic route (AI writes a script you run).
+- [SPARQL from a plain English question](./docs/exercises/sparql-from-a-question.md): turn a plain English question into a working SPARQL query, run it on query.wikidata.org, and iterate until the result table is what you wanted.
+- [QuickStatements from your own CSV](./docs/exercises/quickstatements-from-csv.md): bring a small CSV and repeat the live demo on your own data, sandbox first.
+- [QuickStatements from a prose blob](./docs/exercises/quickstatements-from-prose.md): extract claims from a museum label, catalogue entry, obituary, or press release, and run them on the Wikidata Sandbox.
+- [Clean a messy spreadsheet](./docs/exercises/clean-a-messy-spreadsheet.md): clean a real spreadsheet two ways (let the AI rewrite the data, or have the AI suggest deterministic rules and write a script) and compare the routes.
+- [Have the AI grill you](./docs/exercises/ai-grills-you.md): bring something you have already made and use the AI as a sceptical interviewer. The output is a sharper understanding of your own work.
 
 ### Tools
 
